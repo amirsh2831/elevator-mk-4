@@ -57,6 +57,8 @@ The three features are stored as:
 
 for each frame.
 
+** the full feature extraction process can be found in the wiht_ui.py and used anywhere else.**
+
 ## Original Training Data
 The original training recordings were made using a laptop and Audacity.
 The recordings were:
@@ -167,9 +169,14 @@ Both are tkinter GUIs with the same flow: Select Samples Folder → Load/Split �
 ## ESP32 test
 
 - `esp_tests/Eelevator mk I.ino` does `#include "weights.h"`, which is **not in the repo** — it's the exported file from `keyword_with_ui.py` saved as `weights.h` next to the sketch. `weights/Key_Word_Weights.txt` is the same export already saved.
-- The sketch hardcodes a 237-float `test_sample`; it comes from the print output of `keyword_with_ui.py`'s "Select WAV File to Test" (paste the printed values).
-- Manual forward pass: 237→128→64→2, ReLU on layers 1–2, raw logits on output, winner takes all. Test LED on GPIO 15.
 
 ## Dependencies
 
 - Python: torch, numpy, scipy, scikit-learn, matplotlib, tkinter. Headless environments can still run `extract_all_features.py` → `feature_visulization.py` (batch feature extraction → `features.npy`/`labels.npy` + plots).
+
+## Rules
+- never run git commands or shell commands from outside of the project directory.
+- never rename or change names and typos as drive-by clean up.
+- never assume values specially ESP32 S2 mini and gpio pins.
+- with_ui.py is the whole source of the project (number-classifier), and can be used in anywhere else
+- never add changes to the with_ui.py or keyword_with_ui.py without asking me first.
