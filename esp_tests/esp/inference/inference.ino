@@ -47,15 +47,23 @@ static bool allocateRuntimeData() {
   frameEnergy = (float *)psramArray(sizeof(float) * MAX_SOURCE_FRAMES);
   features = (float (*)[3])psramArray(sizeof(float) * MAX_SOURCE_FRAMES * 3);
 
-  keywordW0 = (float *)psramArray(sizeof(float) * 30336); keywordB0 = (float *)psramArray(sizeof(float) * 128);
-  keywordW1 = (float *)psramArray(sizeof(float) * 8192);  keywordB1 = (float *)psramArray(sizeof(float) * 64);
-  keywordW2 = (float *)psramArray(sizeof(float) * 128);   keywordB2 = (float *)psramArray(sizeof(float) * 2);
-  keywordMean = (float *)psramArray(sizeof(float) * KEY_INPUT); keywordScale = (float *)psramArray(sizeof(float) * KEY_INPUT);
+  keywordW0 = (float *)psramArray(sizeof(float) * 30336);
+  keywordB0 = (float *)psramArray(sizeof(float) * 128);
+  keywordW1 = (float *)psramArray(sizeof(float) * 8192);
+  keywordB1 = (float *)psramArray(sizeof(float) * 64);
+  keywordW2 = (float *)psramArray(sizeof(float) * 128);
+  keywordB2 = (float *)psramArray(sizeof(float) * 2);
+  keywordMean = (float *)psramArray(sizeof(float) * KEY_INPUT);
+  keywordScale = (float *)psramArray(sizeof(float) * KEY_INPUT);
 
-  digitW0 = (float *)psramArray(sizeof(float) * 4032); digitB0 = (float *)psramArray(sizeof(float) * 48);
-  digitW1 = (float *)psramArray(sizeof(float) * 1152); digitB1 = (float *)psramArray(sizeof(float) * 24);
-  digitW2 = (float *)psramArray(sizeof(float) * 240);  digitB2 = (float *)psramArray(sizeof(float) * 10);
-  digitMean = (float *)psramArray(sizeof(float) * DIGIT_INPUT); digitScale = (float *)psramArray(sizeof(float) * DIGIT_INPUT);
+  digitW0 = (float *)psramArray(sizeof(float) * 4032);
+  digitB0 = (float *)psramArray(sizeof(float) * 48);
+  digitW1 = (float *)psramArray(sizeof(float) * 1152);
+  digitB1 = (float *)psramArray(sizeof(float) * 24);
+  digitW2 = (float *)psramArray(sizeof(float) * 240);
+  digitB2 = (float *)psramArray(sizeof(float) * 10);
+  digitMean = (float *)psramArray(sizeof(float) * DIGIT_INPUT);
+  digitScale = (float *)psramArray(sizeof(float) * DIGIT_INPUT);
 
   return audio && frameEnergy && features && keywordW0 && keywordB0 && keywordW1 && keywordB1 &&
          keywordW2 && keywordB2 && keywordMean && keywordScale && digitW0 && digitB0 && digitW1 &&
@@ -63,14 +71,22 @@ static bool allocateRuntimeData() {
 }
 
 static void copyRuntimeData() {
-  memcpy(keywordW0, keyword_network_0_weight, sizeof(float) * 30336); memcpy(keywordB0, keyword_network_0_bias, sizeof(float) * 128);
-  memcpy(keywordW1, keyword_network_3_weight, sizeof(float) * 8192);  memcpy(keywordB1, keyword_network_3_bias, sizeof(float) * 64);
-  memcpy(keywordW2, keyword_network_6_weight, sizeof(float) * 128);   memcpy(keywordB2, keyword_network_6_bias, sizeof(float) * 2);
-  memcpy(keywordMean, keyword_scaler_mean, sizeof(float) * KEY_INPUT); memcpy(keywordScale, keyword_scaler_scale, sizeof(float) * KEY_INPUT);
-  memcpy(digitW0, digit_network_0_weight, sizeof(float) * 4032); memcpy(digitB0, digit_network_0_bias, sizeof(float) * 48);
-  memcpy(digitW1, digit_network_3_weight, sizeof(float) * 1152); memcpy(digitB1, digit_network_3_bias, sizeof(float) * 24);
-  memcpy(digitW2, digit_network_6_weight, sizeof(float) * 240);  memcpy(digitB2, digit_network_6_bias, sizeof(float) * 10);
-  memcpy(digitMean, digit_scaler_mean, sizeof(float) * DIGIT_INPUT); memcpy(digitScale, digit_scaler_scale, sizeof(float) * DIGIT_INPUT);
+  memcpy(keywordW0, keyword_network_0_weight, sizeof(float) * 30336);
+  memcpy(keywordB0, keyword_network_0_bias, sizeof(float) * 128);
+  memcpy(keywordW1, keyword_network_3_weight, sizeof(float) * 8192);
+  memcpy(keywordB1, keyword_network_3_bias, sizeof(float) * 64);
+  memcpy(keywordW2, keyword_network_6_weight, sizeof(float) * 128);
+  memcpy(keywordB2, keyword_network_6_bias, sizeof(float) * 2);
+  memcpy(keywordMean, keyword_scaler_mean, sizeof(float) * KEY_INPUT);
+  memcpy(keywordScale, keyword_scaler_scale, sizeof(float) * KEY_INPUT);
+  memcpy(digitW0, digit_network_0_weight, sizeof(float) * 4032);
+  memcpy(digitB0, digit_network_0_bias, sizeof(float) * 48);
+  memcpy(digitW1, digit_network_3_weight, sizeof(float) * 1152);
+  memcpy(digitB1, digit_network_3_bias, sizeof(float) * 24);
+  memcpy(digitW2, digit_network_6_weight, sizeof(float) * 240);
+  memcpy(digitB2, digit_network_6_bias, sizeof(float) * 10);
+  memcpy(digitMean, digit_scaler_mean, sizeof(float) * DIGIT_INPUT);
+  memcpy(digitScale, digit_scaler_scale, sizeof(float) * DIGIT_INPUT);
 }
 
 static void setupI2S() {
@@ -99,8 +115,19 @@ static void recordAudio(uint32_t seconds, int16_t *dst) {
     if (i2s_read(I2S_PORT, buf, sizeof(buf), &bytes, portMAX_DELAY) != ESP_OK) continue;
     uint32_t words = bytes / sizeof(int32_t);
     // RIGHT_LEFT interleaves left, right. The microphone is configured LEFT.
-    for (uint32_t i = 0; i < words && got < wanted; i += 2)
-      dst[got++] = (int16_t)(buf[i] >> 16);
+    for (uint32_t i = 0; i < words && got < wanted; i += 2){
+
+    
+      int32_t converted = buf[i] >> 8;
+
+    if (converted > 32767)
+        converted = 32767;
+
+    if (converted < -32768)
+        converted = -32768;
+
+    dst[got++] = (int16_t)converted;
+    }
   }
 }
 
@@ -139,10 +166,15 @@ static int makeFeatures(uint32_t samples, bool keyword) {
   if (!count) return 0;
   float maxE=0,maxA=0,maxZ=0;
   // Re-find the first active frame (activeFrames deliberately returns Python length).
-  int total=(samples-FRAME_SIZE)/HOP_SIZE+1; float peak=0;
+  int total=(samples-FRAME_SIZE)/HOP_SIZE+1;
+  float peak=0;
+
   for(int n=0;n<total;n++) if(frameEnergy[n]>peak) peak=frameEnergy[n];
   while(first<total && frameEnergy[first]/peak<VAD_THRESHOLD) first++;
-  for(int n=0;n<count;n++) { int s=(first+n)*HOP_SIZE; float e=0,a=0; int z=0;
+
+  for(int n=0;n<count;n++) {
+    int s=(first+n)*HOP_SIZE;
+    float e=0,a=0; int z=0;
     float prev=audio[s]/32768.0f; for(int j=0;j<FRAME_SIZE;j++){float x=audio[s+j]/32768.0f;e+=x*x;a+=fabsf(x);if(j&&x*prev<0)z++;prev=x;}
     features[n][0]=e; features[n][1]=a/FRAME_SIZE; features[n][2]=(float)z; if(e>maxE)maxE=e;if(a>maxA)maxA=a;if(z>maxZ)maxZ=z;
   }
@@ -152,26 +184,90 @@ static int makeFeatures(uint32_t samples, bool keyword) {
 
 static int classify(float *x, int in, bool keyword) {
   if(keyword){for(int i=0;i<in;i++) input[i]=(x[i]-keywordMean[i])*keywordScale[i];
-    for(int j=0;j<128;j++){float s=keywordB0[j];for(int i=0;i<237;i++)s+=input[i]*keywordW0[j*237+i];hiddenA[j]=s>0?s:0;}
-    for(int j=0;j<64;j++){float s=keywordB1[j];for(int i=0;i<128;i++)s+=hiddenA[i]*keywordW1[j*128+i];hiddenB[j]=s>0?s:0;}
-    int best=0;float bv=-1e30;for(int j=0;j<2;j++){float s=keywordB2[j];for(int i=0;i<64;i++)s+=hiddenB[i]*keywordW2[j*64+i];if(s>bv)bv=s,best=j;}return best;
-  } else {for(int i=0;i<in;i++)input[i]=(x[i]-digitMean[i])*digitScale[i];
-    for(int j=0;j<48;j++){float s=digitB0[j];for(int i=0;i<84;i++)s+=input[i]*digitW0[j*84+i];hiddenA[j]=s>0?s:0;}
-    for(int j=0;j<24;j++){float s=digitB1[j];for(int i=0;i<48;i++)s+=hiddenA[i]*digitW1[j*48+i];hiddenB[j]=s>0?s:0;}
-    int best=0;float bv=-1e30;for(int j=0;j<10;j++){float s=digitB2[j];for(int i=0;i<24;i++)s+=hiddenB[i]*digitW2[j*24+i];if(s>bv)bv=s,best=j;}return best;
+    for(int j=0;j<128;j++){
+      float s=keywordB0[j];for(int i=0;i<237;i++)s+=input[i]*keywordW0[j*237+i];
+      hiddenA[j]=s>0?s:0;
+    }
+
+    for(int j=0;j<64;j++){
+      float s=keywordB1[j];
+      for(int i=0;i<128;i++)s+=hiddenA[i]*keywordW1[j*128+i];
+      hiddenB[j]=s>0?s:0;
+    }
+
+    int best=0;
+    float bv=-1e30;
+    for(int j=0;j<2;j++){
+      float s=keywordB2[j];
+      for(int i=0;i<64;i++)s+=hiddenB[i]*keywordW2[j*64+i];
+      if(s>bv)bv=s,best=j;
+    }
+
+    return best;
+  } else {
+    for(int i=0;i<in;i++)input[i]=(x[i]-digitMean[i])*digitScale[i];
+
+    for(int j=0;j<48;j++){
+      float s=digitB0[j];
+      for(int i=0;i<84;i++)s+=input[i]*digitW0[j*84+i];
+      hiddenA[j]=s>0?s:0;
+    }
+
+    for(int j=0;j<24;j++){
+      float s=digitB1[j];
+      for(int i=0;i<48;i++)s+=hiddenA[i]*digitW1[j*48+i];
+      hiddenB[j]=s>0?s:0;
+    }
+
+    int best=0;
+    float bv=-1e30;
+    for(int j=0;j<10;j++){
+      float s=digitB2[j];
+      for(int i=0;i<24;i++)s+=hiddenB[i]*digitW2[j*24+i];
+      if(s>bv)bv=s,best=j;
+    }
+
+    return best;
   }
 }
 
 void setup(){
-  Serial.begin(115200); pinMode(WAKE_RECORD_LED,OUTPUT); pinMode(NUMBER_RECORD_LED,OUTPUT);
+  Serial.begin(115200);
+  pinMode(WAKE_RECORD_LED,OUTPUT);
+  pinMode(NUMBER_RECORD_LED,OUTPUT);
   Serial.printf("PSRAM found: %s, total: %u, free: %u\n", psramFound()?"yes":"no", ESP.getPsramSize(), ESP.getFreePsram());
-  if(!psramFound() || !allocateRuntimeData()){ Serial.println("ERROR: PSRAM allocation failed"); while(true) delay(1000); }
-  copyRuntimeData(); Serial.printf("PSRAM runtime data ready; free: %u\n", ESP.getFreePsram());
+
+  if(!psramFound() || !allocateRuntimeData()){
+    Serial.println("ERROR: PSRAM allocation failed");
+    while(true) delay(1000);
+  }
+
+  copyRuntimeData();
+  Serial.printf("PSRAM runtime data ready; free: %u\n", ESP.getFreePsram());
   setupI2S(); Serial.println("Inference ready");
 }
+
 void loop(){
-  Serial.println("Recording wake word...");digitalWrite(WAKE_RECORD_LED,HIGH);recordAudio(WAKE_SECONDS,audio);digitalWrite(WAKE_RECORD_LED,LOW);
-  makeFeatures(SAMPLE_RATE*WAKE_SECONDS,true);int key=classify(input,KEY_INPUT,true);Serial.printf("Keyword class: %d\n",key);if(key!=1){Serial.println("Wake word not detected; retrying.");return;}
-  Serial.println("Wake word detected. Recording number...");digitalWrite(NUMBER_RECORD_LED,HIGH);recordAudio(NUMBER_SECONDS,audio);digitalWrite(NUMBER_RECORD_LED,LOW);
-  makeFeatures(SAMPLE_RATE*NUMBER_SECONDS,false);int digit=classify(input,DIGIT_INPUT,false);Serial.printf("Final number: %d\n",digit+1);delay(250);
+  Serial.println("Recording wake word...");
+  digitalWrite(WAKE_RECORD_LED,HIGH);
+  recordAudio(WAKE_SECONDS,audio);
+  digitalWrite(WAKE_RECORD_LED,LOW);
+  makeFeatures(SAMPLE_RATE*WAKE_SECONDS,true);
+  int key=classify(input,KEY_INPUT,true);
+  Serial.printf("Keyword class: %d\n",key);
+
+  if(key!=1){
+    Serial.println("Wake word not detected;
+      retrying.");
+      return;
+  }
+
+  Serial.println("Wake word detected. Recording number...");
+  digitalWrite(NUMBER_RECORD_LED,HIGH);
+  recordAudio(NUMBER_SECONDS,audio);
+  digitalWrite(NUMBER_RECORD_LED,LOW);
+  makeFeatures(SAMPLE_RATE*NUMBER_SECONDS,false);
+  int digit=classify(input,DIGIT_INPUT,false);
+  Serial.printf("Final number: %d\n",digit+1);
+  delay(250);
 }

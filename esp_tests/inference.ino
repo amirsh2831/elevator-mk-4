@@ -54,7 +54,15 @@ static void recordAudio(uint32_t seconds, int16_t *dst) {
     uint32_t words = bytes / sizeof(int32_t);
     // RIGHT_LEFT interleaves left, right. The microphone is configured LEFT.
     for (uint32_t i = 0; i < words && got < wanted; i += 2)
-      dst[got++] = (int16_t)(buf[i] >> 16);
+      int32_t converted = buf[i] >> 8;
+
+      if (converted > 32767)
+        converted = 32767;
+
+      if (converted < -32768)
+        converted = -32768;
+
+      dst[got++] = (int16_t)converted;
   }
 }
 
@@ -89,37 +97,129 @@ static void resizeAndFlatten(int sourceCount, int target, bool keyword) {
 }
 
 static int makeFeatures(uint32_t samples, bool keyword) {
-  int count = activeFrames(samples); int first = 0;
+  int count = activeFrames(samples);
+  int first = 0;
   if (!count) return 0;
   float maxE=0,maxA=0,maxZ=0;
   // Re-find the first active frame (activeFrames deliberately returns Python length).
-  int total=(samples-FRAME_SIZE)/HOP_SIZE+1; float peak=0;
+  int total=(samples-FRAME_SIZE)/HOP_SIZE+1;
+  float peak=0;
+
   for(int n=0;n<total;n++) if(frameEnergy[n]>peak) peak=frameEnergy[n];
   while(first<total && frameEnergy[first]/peak<VAD_THRESHOLD) first++;
-  for(int n=0;n<count;n++) { int s=(first+n)*HOP_SIZE; float e=0,a=0; int z=0;
-    float prev=audio[s]/32768.0f; for(int j=0;j<FRAME_SIZE;j++){float x=audio[s+j]/32768.0f;e+=x*x;a+=fabsf(x);if(j&&x*prev<0)z++;prev=x;}
-    features[n][0]=e; features[n][1]=a/FRAME_SIZE; features[n][2]=(float)z; if(e>maxE)maxE=e;if(a>maxA)maxA=a;if(z>maxZ)maxZ=z;
+
+  for(int n=0;n<count;n++) {
+    int s=(first+n)*HOP_SIZE;
+    float e=0,a=0;
+    int z=0;
+    float prev=audio[s]/32768.0f;
+
+    for(int j=0;j<FRAME_SIZE;j++){
+      float x=audio[s+j]/32768.0f;
+      e+=x*x;
+      a+=fabsf(x);
+      if(j&&x*prev<0)z++;prev=x;
+    }
+
+    features[n][0]=e;
+    features[n][1]=a/FRAME_SIZE;
+    features[n][2]=(float)z;
+
+    if(e>maxE)maxE=e;
+    if(a>maxA)maxA=a;
+    if(z>maxZ)maxZ=z;
   }
-  if(keyword) for(int n=0;n<count;n++){features[n][0]/=maxE;features[n][1]/=maxA;features[n][2]/=maxZ;}
-  resizeAndFlatten(count, keyword?79:28, keyword); return keyword?KEY_INPUT:DIGIT_INPUT;
+
+  if(keyword) for(int n=0;n<count;n++){
+    features[n][0]/=maxE;
+    features[n][1]/=maxA;
+    features[n][2]/=maxZ;
+  }
+  resizeAndFlatten(count, keyword?79:28, keyword);
+
+  return keyword?KEY_INPUT:DIGIT_INPUT;
 }
 
 static int classify(float *x, int in, bool keyword) {
-  if(keyword){for(int i=0;i<in;i++) input[i]=(x[i]-keyword_scaler_mean[i])*keyword_scaler_scale[i];
-    for(int j=0;j<128;j++){float s=keyword_network_0_bias[j];for(int i=0;i<237;i++)s+=input[i]*keyword_network_0_weight[j*237+i];hiddenA[j]=s>0?s:0;}
-    for(int j=0;j<64;j++){float s=keyword_network_3_bias[j];for(int i=0;i<128;i++)s+=hiddenA[i]*keyword_network_3_weight[j*128+i];hiddenB[j]=s>0?s:0;}
-    int best=0;float bv=-1e30;for(int j=0;j<2;j++){float s=keyword_network_6_bias[j];for(int i=0;i<64;i++)s+=hiddenB[i]*keyword_network_6_weight[j*64+i];if(s>bv)bv=s,best=j;}return best;
-  } else {for(int i=0;i<in;i++)input[i]=(x[i]-digit_scaler_mean[i])*digit_scaler_scale[i];
-    for(int j=0;j<48;j++){float s=digit_network_0_bias[j];for(int i=0;i<84;i++)s+=input[i]*digit_network_0_weight[j*84+i];hiddenA[j]=s>0?s:0;}
-    for(int j=0;j<24;j++){float s=digit_network_3_bias[j];for(int i=0;i<48;i++)s+=hiddenA[i]*digit_network_3_weight[j*48+i];hiddenB[j]=s>0?s:0;}
-    int best=0;float bv=-1e30;for(int j=0;j<10;j++){float s=digit_network_6_bias[j];for(int i=0;i<24;i++)s+=hiddenB[i]*digit_network_6_weight[j*24+i];if(s>bv)bv=s,best=j;}return best;
+  if(keyword){
+    for(int i=0;i<in;i++) input[i]=(x[i]-keyword_scaler_mean[i])*keyword_scaler_scale[i];
+
+    for(int j=0;j<128;j++){
+      float s=keyword_network_0_bias[j];
+      for(int i=0;i<237;i++)s+=input[i]*keyword_network_0_weight[j*237+i];
+      hiddenA[j]=s>0?s:0;
+    }
+
+    for(int j=0;j<64;j++){
+      float s=keyword_network_3_bias[j];
+      for(int i=0;i<128;i++)s+=hiddenA[i]*keyword_network_3_weight[j*128+i];
+      hiddenB[j]=s>0?s:0;
+    }
+
+    int best=0;
+    float bv=-1e30;
+
+    for(int j=0;j<2;j++){
+      float s=keyword_network_6_bias[j];
+      for(int i=0;i<64;i++)s+=hiddenB[i]*keyword_network_6_weight[j*64+i];
+      if(s>bv)bv=s,best=j;
+    }
+
+    return best;
+  } else {
+    for(int i=0;i<in;i++)input[i]=(x[i]-digit_scaler_mean[i])*digit_scaler_scale[i];
+
+    for(int j=0;j<48;j++){
+      float s=digit_network_0_bias[j];
+      for(int i=0;i<84;i++)s+=input[i]*digit_network_0_weight[j*84+i];
+      hiddenA[j]=s>0?s:0;
+    }
+
+    for(int j=0;j<24;j++){
+      float s=digit_network_3_bias[j];
+      for(int i=0;i<48;i++)s+=hiddenA[i]*digit_network_3_weight[j*48+i];
+      hiddenB[j]=s>0?s:0;
+    }
+
+    int best=0;
+    float bv=-1e30;
+
+    for(int j=0;j<10;j++){
+      float s=digit_network_6_bias[j];
+      for(int i=0;i<24;i++)s+=hiddenB[i]*digit_network_6_weight[j*24+i];
+      if(s>bv)bv=s,best=j;
+    }
+    return best;
   }
 }
 
-void setup(){Serial.begin(115200);pinMode(WAKE_RECORD_LED,OUTPUT);pinMode(NUMBER_RECORD_LED,OUTPUT);setupI2S();Serial.println("Inference ready");}
+void setup(){
+  Serial.begin(115200);
+  pinMode(WAKE_RECORD_LED,OUTPUT);
+  pinMode(NUMBER_RECORD_LED,OUTPUT);
+  setupI2S();Serial.println("Inference ready");
+}
+
 void loop(){
-  Serial.println("Recording wake word...");digitalWrite(WAKE_RECORD_LED,HIGH);recordAudio(WAKE_SECONDS,audio);digitalWrite(WAKE_RECORD_LED,LOW);
-  makeFeatures(SAMPLE_RATE*WAKE_SECONDS,true);int key=classify(input,KEY_INPUT,true);Serial.printf("Keyword class: %d\n",key);if(key!=1){Serial.println("Wake word not detected; retrying.");return;}
-  Serial.println("Wake word detected. Recording number...");digitalWrite(NUMBER_RECORD_LED,HIGH);recordAudio(NUMBER_SECONDS,audio);digitalWrite(NUMBER_RECORD_LED,LOW);
-  makeFeatures(SAMPLE_RATE*NUMBER_SECONDS,false);int digit=classify(input,DIGIT_INPUT,false);Serial.printf("Final number: %d\n",digit+1);delay(250);
+  Serial.println("Recording wake word...");
+  digitalWrite(WAKE_RECORD_LED,HIGH);
+  recordAudio(WAKE_SECONDS,audio);
+  digitalWrite(WAKE_RECORD_LED,LOW);
+  makeFeatures(SAMPLE_RATE*WAKE_SECONDS,true);
+  int key=classify(input,KEY_INPUT,true);
+  Serial.printf("Keyword class: %d\n",key);
+
+  if(key!=1){Serial.println("Wake word not detected;
+      retrying.");
+      return;
+  }
+
+  Serial.println("Wake word detected. Recording number...");
+  digitalWrite(NUMBER_RECORD_LED,HIGH);
+  recordAudio(NUMBER_SECONDS,audio);
+  digitalWrite(NUMBER_RECORD_LED,LOW);
+  makeFeatures(SAMPLE_RATE*NUMBER_SECONDS,false);
+  int digit=classify(input,DIGIT_INPUT,false);
+  Serial.printf("Final number: %d\n",digit+1);
+  delay(250);
 }
