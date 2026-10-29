@@ -60,6 +60,13 @@ def extract(path):
         energies[n] = energy
         averages[n] = avg
         zcr[n] = z
+    if length > 0:
+        max_energy = np.max(energies) if np.max(energies) > 0 else 1.0
+        max_avg = np.max(averages) if np.max(averages) > 0 else 1.0
+        max_zcr = np.max(zcr) if np.max(zcr) > 0 else 1.0
+        energies = energies / max_energy
+        averages = averages / max_avg
+        zcr = zcr / max_zcr   
     features = np.array([energies, averages, zcr])
     return features
 
@@ -306,41 +313,34 @@ class SpeechRecognitionApp:
             messagebox.showerror("Error", "Train the model first!")
             return
 
-        # Ask where to save
         save_path = filedialog.asksaveasfilename(
-            defaultextension=".txt",
-            filetypes=[("Text file", "*.txt"), ("All files", "*.*")],
-            title="Save Weights as C Arrays"
+            defaultextension=".h",
+            filetypes=[("C header", "*.h"), ("All files", "*.*")],
+            title="Save as digit_weights.h"
         )
         if not save_path:
             return
 
-        with open(save_path, 'w') as f:
-            f.write("// Weights and Biases for ESP32\n")
-            f.write("// Input: 84 - Hidden1 - Hidden2 - Output: 10\n")
-            f.write("// Use float arrays in C\n\n")
+        def write_array(f, name, values, fmt):
+            f.write(f"const float {name}[{len(values)}] = {{\n")
+            for i in range(0, len(values), 8):
+                line = ", ".join(fmt.format(v) for v in values[i:i + 8])
+                f.write("  " + line + ("," if i + 8 < len(values) else "") + "\n")
+            f.write("};\n\n")
 
+        with open(save_path, "w") as f:
+            f.write("// Digit model: input 84 - hidden 48 - 24 - output 10\n\n")
+
+            # Weights and biases: names like digit_network_0_weight
             for name, param in self.model.named_parameters():
-                arr = param.data.cpu().numpy()
-                flat = arr.flatten()
-                c_name = name.replace('.', '_')  # e.g., network.0.weight → network_0_weight
+                write_array(f, "digit_" + name.replace(".", "_"),
+                            param.data.cpu().numpy().flatten(), "{:.6f}f")
 
-                f.write(f"const float {c_name}[{flat.size}] = {{\n")
-                for i in range(0, len(flat), 8):  # 8 values per line for readability
-                    chunk = flat[i:i+8]
-                    line = ", ".join([f"{v:.6f}f" for v in chunk])
-                    f.write("  " + line)
-                    if i + 8 < len(flat):
-                        f.write(",")
-                    f.write("\n")
-                f.write("};\n\n")
-
-            # Also export scaler mean and scale
-            f.write("// StandardScaler parameters\n")
-            mean = self.scaler.mean_
-            scale = 1 / np.sqrt(self.scaler.var_)  # scale = 1 / std
-            f.write("const float scaler_mean[84] = {" + ", ".join([f"{v:.6f}f" for v in mean]) + "};\n")
-            f.write("const float scaler_scale[84] = {" + ", ".join([f"{v:.6f}f" for v in scale]) + "};\n")
+            # Scaler: scale_ is the std. The firmware computes (x - mean) / scale.
+            # Scientific notation is needed because the energy values are huge.
+            f.write("// StandardScaler: apply as (x - mean) / scale\n")
+            write_array(f, "digit_scaler_mean", self.scaler.mean_, "{:.9e}f")
+            write_array(f, "digit_scaler_scale", self.scaler.scale_, "{:.9e}f")
 
         messagebox.showinfo("Success", f"Weights exported to:\n{save_path}")
 

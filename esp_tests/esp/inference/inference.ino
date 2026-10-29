@@ -69,7 +69,7 @@ static const Layer kDigitLayers[3] = {
 static const Model kKeywordModel = {"keyword", kKeywordLayers,
     (const float*)keyword_scaler_mean, (const float*)keyword_scaler_scale, 79, true};
 static const Model kDigitModel = {"digit", kDigitLayers,
-    (const float*)digit_scaler_mean, (const float*)digit_scaler_scale, 28, false};
+    (const float*)digit_scaler_mean, (const float*)digit_scaler_scale, 28, true};
 
 // ============================================================
 // Buffers
