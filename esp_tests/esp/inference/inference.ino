@@ -20,6 +20,7 @@ constexpr int kMaxFrames = (kClipSamples - kFrameSize) / kHop + 1;
 
 constexpr uint32_t kSettleMs = 300;            // mic start-up, discarded
 constexpr float kGain = 1.0f / 4.0f;           // use the same gain as your working recorder
+constexpr float kDigitGain = 1.0f / 16.0f;
 constexpr float kDcPole = 0.9986f;             // DC blocker, about 10 Hz at 44.1 kHz
 constexpr float kMinPeakRms = 150.0f;          // silence gate; tune it from the printed peakRms
 
@@ -82,7 +83,7 @@ static float gInput[79 * 3];                   // resized, flattened, scaled mod
 // 1) Capture: mono 32-bit I2S -> 16-bit samples, DC removed
 //    A fresh driver per clip avoids the overflow noise we fixed earlier.
 // ============================================================
-static bool captureClip(int ledPin) {
+static bool captureClip(int ledPin, float gain) {
   const i2s_config_t cfg = {
       .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
       .sample_rate = kSampleRate,
@@ -123,7 +124,7 @@ static bool captureClip(int ledPin) {
       const float y = x - x1 + kDcPole * y1;         // remove DC offset
       x1 = x; y1 = y;
       if (n >= settle) {
-        long v = lroundf(y * kGain);
+        long v = lroundf(y * gain);
         gAudio[n - settle] = (int16_t)constrain(v, -32768L, 32767L);
       }
     }
@@ -286,13 +287,13 @@ void loop() {
   float prob = 0;
 
   Serial.println("\nListening for the wake word (speak while the LED is on)...");
-  if (!captureClip(kLedWake)) { Serial.println("ERR: I2S capture failed"); delay(500); return; }
+  if (!captureClip(kLedWake, kGain)) { Serial.println("ERR: I2S capture failed"); delay(500); return; }
   const int key = runModel(kKeywordModel, &prob);
   Serial.printf("Keyword class: %d (p=%.2f)\n", key, prob);
   if (key != 1) return;                              // class 1 = keyword, as in training
 
   Serial.println("Wake word detected. Say a number (speak while the LED is on)...");
-  if (!captureClip(kLedNumber)) { Serial.println("ERR: I2S capture failed"); delay(500); return; }
+  if (!captureClip(kLedNumber, kDigitGain)) { Serial.println("ERR: I2S capture failed"); delay(500); return; }
   const int digit = runModel(kDigitModel, &prob);
   if (digit >= 0) Serial.printf("Final number: %d (p=%.2f)\n", digit + 1, prob);
 }

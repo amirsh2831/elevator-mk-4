@@ -9,7 +9,7 @@ constexpr int PIN_WS  = 7;
 constexpr int PIN_SD  = 9;
 
 // ---------- Audio ----------
-constexpr uint32_t SAMPLE_RATE     = 16000;
+constexpr uint32_t SAMPLE_RATE     = 44100;
 constexpr uint32_t MIN_DURATION_MS = 100;
 constexpr uint32_t MAX_DURATION_MS = 5000;   // 5 s = 160 KB RAM
 constexpr uint32_t SETTLE_MS       = 300;    // mic wake-up + DC filter warm-up
