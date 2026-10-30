@@ -20,6 +20,7 @@ def extract(path):
     sample_rate, data = wav.read(path)
     if (len(data.shape) == 2):
         data = np.mean(data, axis=1)
+    data = data.astype(np.float64)
     num_frames = (len(data) - frame_size) // (frame_size // 2) + 1
     vad_energies = []
     for i in range(num_frames):
@@ -187,15 +188,26 @@ class SpeechRecognitionApp:
             all_features.append(combined)
 
         X = np.array(all_features)
-        y = np.array([i // 10 for i in range(len(all_features))])
 
-        #  7 train + 3 test per digit
+        CLIPS_PER_DIGIT = 20
+        TRAIN_PER_DIGIT = 19
+
+        if len(X) % CLIPS_PER_DIGIT != 0 or len(X) // CLIPS_PER_DIGIT != 10:
+            messagebox.showerror(
+                "Error",
+                f"Expected {10 * CLIPS_PER_DIGIT} files (10 digits x {CLIPS_PER_DIGIT}), found {len(X)}."
+            )
+            return
+
+        y = np.array([i // CLIPS_PER_DIGIT for i in range(len(X))])
+
+        #  17 train + 3 test per digit
         train_indices = []
         test_indices = []
         for digit in range(10):
             digit_indices = np.where(y == digit)[0]
-            train_indices.extend(digit_indices[:7])
-            test_indices.extend(digit_indices[7:10])
+            train_indices.extend(digit_indices[:TRAIN_PER_DIGIT])
+            test_indices.extend(digit_indices[TRAIN_PER_DIGIT:])
 
         X_train = X[train_indices]
         y_train = y[train_indices]

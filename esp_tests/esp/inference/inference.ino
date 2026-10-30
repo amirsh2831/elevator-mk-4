@@ -20,7 +20,7 @@ constexpr int kMaxFrames = (kClipSamples - kFrameSize) / kHop + 1;
 
 constexpr uint32_t kSettleMs = 300;            // mic start-up, discarded
 constexpr float kGain = 1.0f / 4.0f;           // use the same gain as your working recorder
-constexpr float kDigitGain = 1.0f / 16.0f;
+constexpr float kDigitGain = 1.0f / 4.0f;
 constexpr float kDcPole = 0.9986f;             // DC blocker, about 10 Hz at 44.1 kHz
 constexpr float kMinPeakRms = 150.0f;          // silence gate; tune it from the printed peakRms
 
