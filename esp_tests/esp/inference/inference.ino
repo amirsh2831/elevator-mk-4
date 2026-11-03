@@ -42,6 +42,15 @@ struct Model {
   bool normalizeByMax;     // Python: the "x / max" block at the end of extract()
 };
 
+// segment mapper pin number
+const int mapA = 35;
+const int mapB = 37;
+const int mapF = 33;
+const int mapG = 18;
+const int mapE = 39;
+const int mapD = 40;
+const int mapC = 38;
+
 #define CHECK_SIZE(arr, count) \
   static_assert(sizeof(arr) == sizeof(float) * (count), #arr " has an unexpected size")
 CHECK_SIZE(keyword_network_0_weight, 128 * 237);
@@ -266,6 +275,23 @@ static int runModel(const Model& m, float* probOut) {
 }
 
 // ============================================================
+// right seven segment mapper
+// ============================================================
+
+void  segmentMapper(int number) {
+ static const uint8_t kDigit[10] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
+  static const int kPins[7] = {mapA, mapB, mapC, mapD, mapE, mapF, mapG};
+
+  const bool blank = (number < 0);                 // pass -1 to turn the display off
+  const uint8_t mask = blank ? 0 : kDigit[number % 10];   // 10 shows as 0 on the right display
+
+  for (int s = 0; s < 7; s++) {
+    const bool on = (mask >> s) & 1;
+    digitalWrite(kPins[s], on ? LOW : HIGH);
+  }
+}
+
+// ============================================================
 // Main
 // ============================================================
 void setup() {
@@ -273,6 +299,17 @@ void setup() {
   delay(500);
   pinMode(kLedWake, OUTPUT);
   pinMode(kLedNumber, OUTPUT);
+
+  // segment mapper pins
+  pinMode(mapA, OUTPUT);
+  pinMode(mapB, OUTPUT);
+  pinMode(mapF, OUTPUT);
+  pinMode(mapG, OUTPUT);
+  pinMode(mapE, OUTPUT);
+  pinMode(mapD, OUTPUT);
+  pinMode(mapC, OUTPUT);
+
+  segmentMapper(-1);
 
   gAudio = (int16_t*)(psramFound() ? ps_malloc(kClipSamples * sizeof(int16_t))
                                    : malloc(kClipSamples * sizeof(int16_t)));
@@ -295,5 +332,8 @@ void loop() {
   Serial.println("Wake word detected. Say a number (speak while the LED is on)...");
   if (!captureClip(kLedNumber, kDigitGain)) { Serial.println("ERR: I2S capture failed"); delay(500); return; }
   const int digit = runModel(kDigitModel, &prob);
-  if (digit >= 0) Serial.printf("Final number: %d (p=%.2f)\n", digit + 1, prob);
+  if (digit >= 0) {
+    Serial.printf("Final number: %d (p=%.2f)\n", digit + 1, prob);
+    segmentMapper(digit + 1);
+  } 
 }
